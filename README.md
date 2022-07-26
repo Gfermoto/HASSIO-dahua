@@ -104,6 +104,39 @@ snapshot_vto:
               caption: "Camera VTO {{now().strftime('%H:%M %d-%m-%Y')}}"
         message: "Camera VTO {{now().strftime('%H:%M %d-%m-%Y')}}"
 ```
+### custom:button-card
+```
+type: custom:button-card
+icon: mdi:doorbell
+name: Dahua VTO2111 (OPEN)
+tap_action:
+  action: call-service
+  service: lock.unlock
+  service_data:
+    entity_id: lock.door_lock
+styles:
+  card:
+    - font-size: 12px
+    - font-weight: bold
+color: auto
+show_state: false
+```
+```
+type: custom:button-card
+icon: mdi:doorbell
+name: Dahua VTO2111 (END CALL)
+tap_action:
+  action: call-service
+  service: dahua.vto_cancel_call
+  service_data:
+    entity_id: camera.vto2111_main
+styles:
+  card:
+    - font-size: 12px
+    - font-weight: bold
+color: auto
+show_state: false
+```
 #### The logic of work is the following:
 If the house is disarmed, then after receiving a call and notification with a photo in a telegram, the door opens automatically. Otherwise, script execution stops after notification. The implementation of work through a timer is designed to eliminate the reaction to numerous repeated button presses. There is also a script for taking a photo.
 
