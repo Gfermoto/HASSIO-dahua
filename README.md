@@ -1,3 +1,112 @@
+## The fork of the original add-on does not contain changes, but is made for the sake of publishing code examples for it.
+
+### configuration.yaml
+```
+timer:
+  door_lock:
+    name: Door Lock
+    icon: mdi:timer
+#
+lock:
+  - platform: template
+    name: Door Lock
+    value_template: "{{ not is_state('timer.door_lock', 'active') }}"
+    optimistic: false
+    lock: []
+    unlock:
+      - service: dahua.vto_open_door
+        data:
+          door_id: 1 # - 1st Door, 2 # - 2st Door
+        target:
+          entity_id: camera.vto2111_main
+```
+### automations.yaml
+```
+- alias: Dahua VTO Ring-Open
+  mode: queued
+  trigger:
+    - platform: event
+      event_type: dahua_event_received
+      event_data:
+        Code: BackKeyLight
+  condition: []
+  action:
+    - choose:
+        - conditions: >
+            {{ trigger.event.data.Data.State | int in [1, 2] }}
+          sequence:
+            - service: script.attribute_volume_lo
+            - service: script.attribute_doorbell
+            - service: script.command_on
+            - service: script.snapshot_vto
+            - condition: state
+              entity_id: alarm_control_panel.ha_alarm
+              state: disarmed
+            - delay: 1
+            - service: lock.unlock
+              target:
+                entity_id: lock.door_lock
+        - conditions: >
+            {{ trigger.event.data.Data.State | int == 8 }}
+          sequence:
+            - service: dahua.vto_cancel_call
+              data: {}
+              target:
+                entity_id: camera.vto2111_main
+            - service: timer.start
+              data:
+                entity_id: timer.door_lock
+                duration: 00:00:05 # VTO Unlock Period
+            - service: notify.telegram
+              data:
+                message: 'The door is unlocked. Time: {{now().strftime(''%H:%M
+                  %d-%m-%Y'')}}'
+        - conditions: >
+            {{ trigger.event.data.Data.State | int in [0, 9] }}
+          sequence:
+            - service: timer.cancel
+              data:
+                entity_id: timer.door_lock
+      default:
+        - service: persistent_notification.create
+          data:
+            title: "Unhandled state {{ trigger.event.data.Data.State | int }}"
+            message: "{{ trigger.event.data }}"
+#
+- alias: Came In
+  trigger:
+  - platform: state
+    entity_id: binary_sensor.vto2111_door_status
+    to: 'on'
+  action:
+  - service: notify.telegram
+    data:
+      message: 'Came In'
+```
+### scripts.yaml
+```
+snapshot_vto:
+  alias: Sending a Snapshot from a Camera vto
+  sequence:
+    - service: camera.snapshot
+      data:
+        entity_id: camera.vto2111_main
+        filename: "/config/www/images/vto.jpg"
+    - delay: 00:00:01
+    - service: notify.telegram
+      data:
+        data:
+          method: alarm
+          photo:
+            - url: http://192.168.1.10:8123/local/images/vto.jpg
+              username: !secret ha_username
+              password: !secret ha_password
+              caption: "Camera VTO {{now().strftime('%H:%M %d-%m-%Y')}}"
+        message: "Camera VTO {{now().strftime('%H:%M %d-%m-%Y')}}"
+```
+#### The logic of work is the following:
+If the house is disarmed, then after receiving a call and notification with a photo in a telegram, the door opens automatically. Otherwise, script execution stops after notification. The implementation of work through a timer is designed to eliminate the reaction to numerous repeated button presses. There is also a script for taking a photo.
+
 # Home Assistant Dahua Integration
 The `Dahua` [Home Assistant](https://www.home-assistant.io) integration allows you to integrate your [Dahua](https://www.dahuasecurity.com/) cameras, doorbells, NVRs, DVRs in Home Assistant. It's also confirmed to work with some Lorex cameras and Amcrest devices.
 
